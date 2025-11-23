@@ -1,319 +1,153 @@
+// app/profile/page.tsx
 "use client";
-import React, { useEffect, useState } from "react";
-import { loadUserHistory, saveTodayScore, loadTodayLeaderboard } from "../../lib/localStore";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../context/AuthContext";
+import Image from "next/image";
+import { getUserHistory } from "../../lib/redis";
+import { getUserExerciseHistory } from "../../lib/firestore";
 
-type HistoryMap = Record<string, string>;
 
 export default function ProfilePage() {
-  const [loggedIn, setLoggedIn] = useState<boolean>(false);
+  const { user, isLoggedIn, logout, loading } = useAuth();
+  const router = useRouter();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [history, setHistory] = useState<any>({});
 
-  const [email, setEmail] = useState<string>("");
-  const [name, setName] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-
-  const [history, setHistory] = useState<HistoryMap>({});
-  const [score, setScore] = useState<number | "">("");
-  const [msg, setMsg] = useState<string>("");
-
-  const [adminUnlocked, setAdminUnlocked] = useState<boolean>(false);
-  const [adminPass, setAdminPass] = useState<string>("");
-  const [otherEmail, setOtherEmail] = useState<string>("");
-  const [otherName, setOtherName] = useState<string>("");
-  const [otherScore, setOtherScore] = useState<number | "">("");
-
-  const DEMO_PASSWORD = "123456"; // login password
-  const ADMIN_PASSWORD = "adminpass"; // admin unlock
-
-  // Load current session from localStorage
   useEffect(() => {
-    try {
-      const storedEmail = localStorage.getItem("ft_current_email");
-      const storedName = localStorage.getItem("ft_current_name");
+    if (!loading && !isLoggedIn) {
+      router.push("/");
+    }
+  }, [isLoggedIn, router, loading]);
 
-      if (storedEmail) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setEmail(storedEmail);
-        setName(storedName || "");
-        setLoggedIn(true);
-        setHistory(loadUserHistory(storedEmail));
+  useEffect(() => {
+    const fetchHistory = async () => {
+      if (!loading && isLoggedIn && user?.id) {
+        try {
+          const userHistory = await getUserExerciseHistory(user.id);
+          setHistory(userHistory || {});
+        } catch (error) {
+          console.error("Error loading history:", error);
+        }
       }
-    } catch {}
-  }, []);
+    };
+    
+    fetchHistory();
+  }, [user, loading, isLoggedIn]);
 
-  function showMsg(t: string, delay = 2000) {
-    setMsg(t);
-    setTimeout(() => setMsg(""), delay);
-  }
-
-  // ---------------- LOGIN HANDLER ----------------
-  function login(e?: React.FormEvent) {
-    e?.preventDefault();
-
-    if (!email || !password) return showMsg("Enter email and password");
-
-    if (password !== DEMO_PASSWORD) return showMsg("Wrong password");
-
-    // save user
-    localStorage.setItem("ft_current_email", email);
-    localStorage.setItem("ft_current_name", name);
-    setLoggedIn(true);
-
-    if (email) setHistory(loadUserHistory(email));
-
-    showMsg("Logged in!");
-  }
-
-  // ---------------- PROFILE SAVE ----------------
-  function saveIdentity() {
-    localStorage.setItem("ft_current_email", email);
-    localStorage.setItem("ft_current_name", name);
-    showMsg("Profile saved");
-  }
-
-  // ---------------- USER SCORE ----------------
-  function addOwnScore(e?: React.FormEvent) {
-    e?.preventDefault();
-    if (!email) return showMsg("Set your email first");
-
-    if (score === "" || score === null) return showMsg("Enter score");
-
-    const date = new Date().toISOString().slice(0, 10);
-
-    saveTodayScore(date, email, name || undefined, Number(score));
-    setScore("");
-    setHistory(loadUserHistory(email));
-
-    showMsg("Score saved!");
-  }
-
-  // ---------------- ADMIN UNLOCK ----------------
-  function tryUnlockAdmin(e?: React.FormEvent) {
-    e?.preventDefault();
-    if (adminPass !== ADMIN_PASSWORD) return showMsg("Wrong admin password");
-    setAdminUnlocked(true);
-    showMsg("Admin unlocked");
-    setAdminPass("");
-  }
-
-  // ---------------- ADMIN ADD SCORE ----------------
-  function addOtherScore(e?: React.FormEvent) {
-    e?.preventDefault();
-    if (!adminUnlocked) return showMsg("Unlock admin first");
-
-    if (!otherEmail) return showMsg("Enter email");
-    if (otherScore === "" || otherScore === null) return showMsg("Enter score");
-
-    const date = new Date().toISOString().slice(0, 10);
-
-    saveTodayScore(date, otherEmail, otherName || undefined, Number(otherScore));
-    setOtherEmail("");
-    setOtherName("");
-    setOtherScore("");
-
-    showMsg("Score saved for user");
-  }
-
-  // ---------------- LOGOUT ----------------
-  function logout() {
-    localStorage.removeItem("ft_current_email");
-    localStorage.removeItem("ft_current_name");
-
-    setLoggedIn(false);
-
-    setEmail("");
-    setName("");
-    setPassword("");
-    setHistory({});
-    setAdminUnlocked(false);
-
-    showMsg("Logged out");
-  }
-
-  // -----------------------------------------
-  //  IF NOT LOGGED IN → SHOW LOGIN FORM
-  // -----------------------------------------
-  if (!loggedIn) {
+  
+  if (loading) {
     return (
-      <div className="max-w-md mx-auto space-y-4 card">
-        <h2 className="text-xl font-semibold">Login</h2>
-
-        <form onSubmit={login} className="space-y-3">
-          <div>
-            <label className="text-sm text-zinc-400 block mb-1">Email</label>
-            <input
-              className="input"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="text-sm text-zinc-400 block mb-1">Name</label>
-            <input
-              className="input"
-              placeholder="Your name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="text-sm text-zinc-400 block mb-1">Password</label>
-            <input
-              className="input"
-              type="password"
-              placeholder="123456"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
-          <button className="btn w-full" type="submit">
-            Login
-          </button>
-        </form>
-
-        {msg && <div className="text-sm text-muted">{msg}</div>}
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <p>Loading profile...</p>
+        </div>
       </div>
     );
   }
-
-  // -----------------------------------------
-  //  LOGGED IN → SHOW FULL PROFILE PAGE
-  // -----------------------------------------
+  
+  if (!isLoggedIn) {
+    return;
+  }
+  
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="card">
-        <h2 className="text-xl font-semibold mb-2">Profile</h2>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm text-zinc-400 block mb-1">Email</label>
-            <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-          <div>
-            <label className="text-sm text-zinc-400 block mb-1">Name</label>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-        </div>
-
-        <div className="flex gap-3 mt-3">
-          <button className="btn" onClick={saveIdentity}>
-            Save
-          </button>
-          <button className="btn bg-red-600" onClick={logout}>
-            Logout
-          </button>
-        </div>
-
-        {msg && <div className="text-sm text-muted mt-3">{msg}</div>}
-      </div>
-
-      {/* Add your score */}
-      <section className="card">
-        <h3 className="text-lg font-semibold mb-2">Add your score</h3>
-        <form onSubmit={addOwnScore} className="flex gap-3">
-          <input
-            className="input"
-            value={score}
-            onChange={(e) =>
-              setScore(e.target.value === "" ? "" : Number(e.target.value))
-            }
-            placeholder="Score"
-            type="number"
+    <div className="max-w-3xl mx-auto">
+      <div className="mb-8 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+        {user?.image ? (
+          <Image 
+            src={user.image} 
+            alt={user.name || "User"} 
+            width={64} 
+            height={64} 
+            className="rounded-full"
+            unoptimized // Add this if you get domain errors with Google profile pics
           />
-          <button className="btn">Add</button>
-        </form>
-      </section>
-
-      {/* Admin */}
-      <section className="card">
-        <h3 className="text-lg font-semibold mb-2">Admin unlock</h3>
-
-        {!adminUnlocked ? (
-          <form onSubmit={tryUnlockAdmin} className="flex gap-3">
-            <input
-              className="input"
-              type="password"
-              value={adminPass}
-              onChange={(e) => setAdminPass(e.target.value)}
-              placeholder="Admin password"
-            />
-            <button className="btn">Unlock</button>
-          </form>
         ) : (
-          <div>
-            <div className="text-sm text-zinc-400 mb-2">
-              Admin mode enabled
-            </div>
-
-            <form onSubmit={addOtherScore} className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <input
-                  className="input"
-                  value={otherEmail}
-                  onChange={(e) => setOtherEmail(e.target.value)}
-                  placeholder="user@example.com"
-                  type="email"
-                />
-                <input
-                  className="input"
-                  value={otherName}
-                  onChange={(e) => setOtherName(e.target.value)}
-                  placeholder="Name (optional)"
-                />
-                <input
-                  className="input"
-                  value={otherScore}
-                  onChange={(e) =>
-                    setOtherScore(e.target.value === "" ? "" : Number(e.target.value))
-                  }
-                  placeholder="Score"
-                  type="number"
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <button className="btn" type="submit">
-                  Add for user
-                </button>
-                <button
-                  className="btn bg-red-600"
-                  type="button"
-                  onClick={() => {
-                    setAdminUnlocked(false);
-                    showMsg("Admin locked");
-                  }}
-                >
-                  Lock
-                </button>
-              </div>
-            </form>
+          <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center">
+            <span className="text-2xl font-bold text-white">
+              {user?.name?.charAt(0) || "?"}
+            </span>
           </div>
         )}
-      </section>
+        <div>
+          <h1 className="text-2xl font-bold">{user?.name || "User"}</h1>
+          <p className="text-gray-400">{user?.email}</p>
+        </div>
+      </div>
+      
+      <div className="bg-gray-800 rounded-2xl overflow-hidden mb-8">
+  <div className="bg-gray-700 p-4 flex justify-between items-center">
+    <h2 className="text-xl font-bold">Your Fitness History</h2>
+    <button 
+      onClick={async () => {
+  if (user?.id) {
+    try {
+      const userHistory = await getUserExerciseHistory(user.id);
+      setHistory(userHistory || {});
+    } catch (error) {
+      console.error("Error loading history:", error);
+    }
+  }
+}}
+      className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700 transition"
+    >
+      Refresh History
+    </button>
+  </div>
+  
+  {Object.keys(history).length > 0 ? (
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead className="bg-gray-700">
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              Date
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              Exercise
+            </th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+              Score
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-700">
+          {Object.entries(history)
+            .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .map(([date, entry]: [string, any]) => (
+              <tr key={date} className="hover:bg-gray-700 transition">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {date}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {entry.exercise || <span className="text-gray-400 italic">Not recorded</span>}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-xl font-bold text-red-500">
+                  {entry.score || 0}
+                </td>
+              </tr>
+            ))}
+        </tbody>
+      </table>
+    </div>
+  ) : (
+    <div className="p-6 text-center text-gray-400">
+      No history yet. Start adding scores!
+    </div>
+  )}
+</div>
 
-      {/* History */}
-      <section className="card">
-        <h3 className="text-lg font-semibold mb-2">Your history</h3>
-
-        {Object.keys(history).length === 0 ? (
-          <div className="text-muted">No scores yet</div>
-        ) : (
-          <ul className="space-y-2">
-            {Object.entries(history)
-              .sort((a, b) => b[0].localeCompare(a[0]))
-              .map(([date, s]) => (
-                <li key={date} className="flex justify-between">
-                  <span className="text-sm text-zinc-400">{date}</span>
-                  <span className="font-semibold">{s}</span>
-                </li>
-              ))}
-          </ul>
-        )}
-      </section>
+      
+      <div className="text-center">
+        <button
+          onClick={logout}
+          className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition"
+        >
+          Log Out
+        </button>
+      </div>
     </div>
   );
 }

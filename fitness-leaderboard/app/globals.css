@@ -1,39 +1,26 @@
-@import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 /* app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* small helpers */
-.input { @apply border rounded px-3 py-2 w-full bg-white text-gray-900; font: inherit; }
-.btn { @apply px-4 py-2 rounded-full font-semibold text-white bg-orange-600; }
-.btn:hover { @apply bg-orange-700; }
-.card { @apply bg-zinc-900 text-white rounded-lg p-4; }
-.text-muted { @apply text-zinc-400; }
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 15, 15, 15;
+}
 
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
